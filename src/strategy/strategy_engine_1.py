@@ -1,3 +1,5 @@
+import pandas as pd
+
 STATE_NAMES = {
     0: "Normal Bull",
     1: "Correction",
@@ -7,27 +9,47 @@ STATE_NAMES = {
     5: "Calm Bull"
 }
 
-ALLOCATION_MAP = {
+STATE_WEIGHTS = { # subject to change
     0: 1.0,
-    1: 0.0,
-    2: 0.5,
+    1: 0.25,
+    2: 0.50,
     3: 0.0,
     4: 1.0,
-    5: 1.0
+    5: 0.75
 }
 
 
-def generate_signal(current_state):
-    
-    allocation = ALLOCATION_MAP[current_state]
+def compute_allocation(row):
+    allocation = 0
 
-    if allocation > 0.75:
-        signal = "BUY"
+    for state in range(6):
 
-    elif allocation > 0:
-        signal = "HOLD"
+        allocation += (
+            row[f"State_{state}"]
+            * STATE_WEIGHTS[state]
+        )
 
+    return allocation
+
+def allocation_to_signal(allocation):
+
+    if allocation >= 0.75:
+        return "BUY"
+
+    elif allocation >= 0.25:
+        return "HOLD"
     else:
-        signal = "CASH"
+        return "CASH"
+    
+df = pd.read_csv(
+    "state_probabilities.csv"
+)
 
-    return signal, allocation
+df["Allocation"] = df.apply(
+    compute_allocation,
+    axis=1
+)
+
+df["Signal"] = df["Allocation"].apply(
+    allocation_to_signal
+)
