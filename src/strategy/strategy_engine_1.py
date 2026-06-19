@@ -36,7 +36,7 @@ def compute_allocation(row):
 
     
 df = pd.read_csv(
-    "state_probabilities.csv"
+    "data/state_probabilities.csv"
 )
 
 df["Target_Position"] = df.apply(
@@ -50,6 +50,6 @@ df["Trade_Size"] = df["Target_Position"] - df["Target_Position"].shift(1)
 df["Trade_Size"] = df["Trade_Size"].fillna(df["Target_Position"])
 
 df.to_csv(
-    "signals.csv",
+    "data/signals_strategy_1.csv",
     index=False
 )
