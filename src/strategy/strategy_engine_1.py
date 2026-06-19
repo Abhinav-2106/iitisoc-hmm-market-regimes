@@ -1,15 +1,17 @@
 import pandas as pd
 
+num_states = 6
+
 STATE_NAMES = {
-    0: "Normal Bull",
-    1: "Correction",
-    2: "Neutral/Recovery",
-    3: "Crisis/Panic",
-    4: "Aggressive Bull",
-    5: "Calm Bull"
+    0: "Normal Bull",        # BUll state
+    1: "Correction",         # BEAR state
+    2: "Neutral/Recovery",   # SIDEWAYS state
+    3: "Crisis/Panic",       # BEAR state
+    4: "Aggressive Bull",    # BULL states
+    5: "Calm Bull"           # BULL state
 }
 
-STATE_WEIGHTS = { # subject to change
+STATE_WEIGHTS = {            # subject to change
     0: 1.0,
     1: 0.25,
     2: 0.50,
@@ -22,8 +24,8 @@ STATE_WEIGHTS = { # subject to change
 def compute_allocation(row):
     allocation = 0
 
-    for state in range(6):
-
+    for state in range(num_states):
+        
         allocation += (
             row[f"State_{state}"]
             * STATE_WEIGHTS[state]
@@ -31,25 +33,23 @@ def compute_allocation(row):
 
     return allocation
 
-def allocation_to_signal(allocation):
 
-    if allocation >= 0.75:
-        return "BUY"
-
-    elif allocation >= 0.25:
-        return "HOLD"
-    else:
-        return "CASH"
     
 df = pd.read_csv(
     "state_probabilities.csv"
 )
 
-df["Allocation"] = df.apply(
+df["Target_Position"] = df.apply(
     compute_allocation,
     axis=1
 )
 
-df["Signal"] = df["Allocation"].apply(
-    allocation_to_signal
+df["Trade_Size"] = df["Target_Position"] - df["Target_Position"].shift(1)
+
+# fill first value
+df["Trade_Size"] = df["Trade_Size"].fillna(df["Target_Position"])
+
+df.to_csv(
+    "signals.csv",
+    index=False
 )
