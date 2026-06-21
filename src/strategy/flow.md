@@ -20,3 +20,5 @@ so what it will do is that it will take current regime classification and foreca
 we use state probabilities but first we define something knowna as state weights thay are just simply mean that if we are 100 percent certain that this is the regime then what percentage of capital will we allocate
 
 The final allocation will be simply the dot product of state probabilites and thier respective weights.
+
+

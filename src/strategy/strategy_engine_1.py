@@ -11,13 +11,13 @@ STATE_NAMES = {
     5: "Calm Bull"           # BULL state
 }
 
-STATE_WEIGHTS = {            # subject to change
-    0: 1.0,
-    1: 0.25,
-    2: 0.50,
-    3: 0.0,
-    4: 1.0,
-    5: 0.75
+STATE_WEIGHTS = { # New one for more aggresive approach
+    0: 1.00,
+    1: 0.00,
+    2: 0.75,
+    3: 0.00,
+    4: 1.00,
+    5: 1.00
 }
 
 
