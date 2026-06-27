@@ -22,3 +22,6 @@ we use state probabilities but first we define something knowna as state weights
 The final allocation will be simply the dot product of state probabilites and thier respective weights.
 
 
+## Strategy B
+
+Here we are going to apply the regime specific strategy logic. I have thought of using both the predicted state of the HMM model and the probabilites of regime to be in all the states. So we are going to use the predicted state to activate which strategy to use like mean reversion or momentum and then using the probabilites we are going to decide how intensively we are going to allocate.
