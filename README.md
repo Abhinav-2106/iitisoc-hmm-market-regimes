@@ -66,7 +66,8 @@ The project is organized into independent modules so that each stage of the pipe
 │
 ├── notebooks/
 │   ├── analysis.ipynb
-│   └── backtesting_analysis.ipynb
+│   ├── backtesting_analysis.ipynb
+|   └── base_hmm_model.ipynb
 │
 ├── src/
 │   ├── dashboard/
