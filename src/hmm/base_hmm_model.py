@@ -47,8 +47,6 @@
 # Backtesting
 # Dashboard & Visualization
 
-# pip install yfinance scikit-learn hmmlearn matplotlib
-
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -214,8 +212,8 @@ print(hmm_model.means_)
 print("\nTransition Matrix:")
 print(hmm_model.transmat_)
 
-from google.colab import drive
-drive.mount('/content/drive')
+# from google.colab import drive
+# drive.mount('/content/drive')
 
 features.to_csv(
     "/content/drive/MyDrive/features.csv",
