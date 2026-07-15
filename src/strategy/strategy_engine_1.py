@@ -1,31 +1,30 @@
 import pandas as pd
+from pathlib import Path
+import pandas as pd
 
-num_states = 6
+NUM_STATES = 5
 
 STATE_NAMES = {
-    0: "Normal Bull",        # BUll state
-    1: "Correction",         # BEAR state
-    2: "Neutral/Recovery",   # SIDEWAYS state
-    3: "Crisis/Panic",       # BEAR state
-    4: "Aggressive Bull",    # BULL states
-    5: "Calm Bull"           # BULL state
+    0: "Strong Bull",
+    1: "Normal Bull",
+    2: "Bear Market",
+    3: "Extreme Event",
+    4: "Correction",
 }
 
-STATE_WEIGHTS = { # New one for more aggresive approach
+STATE_WEIGHTS = {
     0: 1.00,
-    1: 0.00,
-    2: 0.75,
+    1: 0.75,
+    2: 0.00,
     3: 0.00,
-    4: 1.00,
-    5: 1.00
+    4: 0.40,
 }
 
 
 def compute_allocation(row):
-    allocation = 0
+    allocation = 0.0
 
-    for state in range(num_states):
-        
+    for state in range(NUM_STATES):
         allocation += (
             row[f"State_{state}"]
             * STATE_WEIGHTS[state]
@@ -34,22 +33,28 @@ def compute_allocation(row):
     return allocation
 
 
-    
+ROOT = Path(__file__).resolve().parents[2]
+
 df = pd.read_csv(
-    "data/state_probabilities.csv"
+    ROOT / "data" / "state_probabilities.csv"
 )
 
 df["Target_Position"] = df.apply(
     compute_allocation,
-    axis=1
+    axis=1,
 )
 
-df["Trade_Size"] = df["Target_Position"] - df["Target_Position"].shift(1)
+df["Trade_Size"] = (
+    df["Target_Position"]
+    - df["Target_Position"].shift(1)
+)
 
-# fill first value
-df["Trade_Size"] = df["Trade_Size"].fillna(df["Target_Position"])
+df["Trade_Size"] = (
+    df["Trade_Size"]
+    .fillna(df["Target_Position"])
+)
 
 df.to_csv(
-    "data/signals_strategy_1.csv",
-    index=False
+    ROOT / "data" / "signals_strategy_1.csv",
+    index=False,
 )

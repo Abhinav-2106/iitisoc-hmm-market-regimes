@@ -4,7 +4,10 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from strategies import momentum, mean_reversion, cash
+from strategies import momentum, mean_reversion, risk
+
+print(risk.__file__)
+print(dir(risk))
 
 MOMENTUM_STATES       = {0, 4, 5}
 MEAN_REVERSION_STATES = {2}
@@ -19,67 +22,200 @@ STATE_NAMES = {
     5: "Calm Bull",
 }
 
-def compute_signal(row: pd.Series) -> float:
-    total = 0.0
-    for i in range(6):
-        prob = float(row[f"Forecast_State_{i}"])
-        if i in MOMENTUM_STATES:
-            s = momentum.signal(row["Close"], row["SMA50"])
-        elif i in MEAN_REVERSION_STATES:
-            s = mean_reversion.signal(row["RSI14"])
-        else:
-            s = cash.signal()
-        total += prob * s
-    return total
+def aggregate_regimes(row: pd.Series):
+    """
+    Aggregate the six forecasted HMM states into
+    Bull, Neutral and Bear probabilities.
+    """
 
+    bull_prob = (
+        row["Forecast_State_0"]
+        + row["Forecast_State_4"]
+        + row["Forecast_State_5"]
+    )
+
+    neutral_prob = (
+        row["Forecast_State_2"]
+    )
+
+    bear_prob = (
+        row["Forecast_State_1"]
+        + row["Forecast_State_3"]
+    )
+
+    return (
+        bull_prob,
+        neutral_prob,
+        bear_prob,
+    )
+
+def compute_position_row(
+    row: pd.Series,
+    transition_matrix: np.ndarray,
+) -> float:
+    """
+    Computes the final portfolio position for a single day.
+    """
+
+    # Aggregate forecast probabilities
+    bull_prob, neutral_prob, bear_prob = aggregate_regimes(row)
+
+    # Strategy confidence scores
+    momentum_score = momentum.score(
+        row["Close"],
+        row["SMA20"],
+        row["SMA50"],
+    )
+
+    mr_score = mean_reversion.score(
+        row["Close"],
+        row["RSI14"],
+        row["BB_Upper"],
+        row["BB_Lower"],
+    )
+
+    # Raw signals
+    bull_signal = bull_prob * momentum_score
+    neutral_signal = neutral_prob * mr_score
+
+    # Forecast probability vector
+    forecast_probs = np.array([
+        row[f"Forecast_State_{i}"]
+        for i in range(6)
+    ])
+
+    # Expected regime stability
+    stability = risk.expected_stability(
+        forecast_probs,
+        transition_matrix,
+    )
+
+    # Apply risk management
+    return risk.apply_risk(
+        bull_signal,
+        neutral_signal,
+        stability,
+    )
 
 if __name__ == "__main__":
 
-    path     = os.path.realpath("strategy_engine_3.py")
+    # ------------------------------------------------------------
+    # Resolve data directory
+    # ------------------------------------------------------------
+    path = os.path.realpath("strategy_engine_3_5.py")
+
     data_dir = os.path.dirname(
         os.path.dirname(path)
     ).replace("src", "data")
+
     os.chdir(data_dir)
 
+    # ------------------------------------------------------------
+    # Load price data
+    # ------------------------------------------------------------
     prices_df = pd.read_csv("clean_data.csv")
-    prices_df["Date"] = pd.to_datetime(prices_df["Date"])
-    prices_df = prices_df.sort_values("Date").reset_index(drop=True)
 
-    prices_df["SMA50"] = momentum.compute_sma(prices_df["Close"])
-    prices_df["RSI14"] = mean_reversion.compute_rsi(prices_df["Close"])
-
-    forecast_df = pd.read_csv("forecast_probabilities.csv")
-    forecast_df["Date"] = pd.to_datetime(forecast_df["Date"])
-    forecast_df = forecast_df.sort_values("Date").reset_index(drop=True)
-
-    df = forecast_df.merge(
-        prices_df[["Date", "Close", "SMA50", "RSI14"]],
-        on="Date",
-        how="inner"
+    prices_df["Date"] = pd.to_datetime(
+        prices_df["Date"]
     )
 
-    forecast_cols          = [f"Forecast_State_{i}" for i in range(6)]
-    df["Forecasted_State"] = df[forecast_cols].values.argmax(axis=1)
-    df["Forecast_Prob"]    = df[forecast_cols].max(axis=1)
+    prices_df = (
+        prices_df
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
 
-    df["Target_Position"] = df.apply(compute_signal, axis=1)
+    # ------------------------------------------------------------
+    # Compute strategy indicators
+    # ------------------------------------------------------------
+    prices_df = momentum.compute_indicators(prices_df)
+
+    prices_df = mean_reversion.compute_indicators(prices_df)
+
+    # ------------------------------------------------------------
+    # Load forecast probabilities
+    # ------------------------------------------------------------
+    forecast_df = pd.read_csv(
+        "forecast_probabilities.csv"
+    )
+    transition_matrix = pd.read_csv(
+        "transition_matrix.csv"
+    ).values
+
+    forecast_df["Date"] = pd.to_datetime(
+        forecast_df["Date"]
+    )
+
+    forecast_df = (
+        forecast_df
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
+
+    # ------------------------------------------------------------
+    # Merge datasets
+    # ------------------------------------------------------------
+    df = forecast_df.merge(
+        prices_df[
+            [
+                "Date",
+                "Close",
+                "SMA20",
+                "SMA50",
+                "RSI14",
+                "BB_Upper",
+                "BB_Lower",
+            ]
+        ],
+        on="Date",
+        how="inner",
+    )
+
+    
+
+    df["Target_Position"] = df.apply(
+        compute_position_row,
+        axis=1,
+        transition_matrix=transition_matrix,
+    )
+
+    # ------------------------------------------------------------
+    # Compute trade size
+    # ------------------------------------------------------------
+    df["Trade_Size"] = (
+        df["Target_Position"]
+        - df["Target_Position"].shift(1)
+    )
 
     df["Trade_Size"] = (
-        df["Target_Position"] - df["Target_Position"].shift(1)
-    ).fillna(df["Target_Position"])
+        df["Trade_Size"]
+        .fillna(df["Target_Position"])
+    )
 
-    output = df[["Date", "Target_Position", "Trade_Size"]]
-    output.to_csv("signals_strategy_3.csv", index=False)
+    # ------------------------------------------------------------
+    # Save output
+    # ------------------------------------------------------------
+    output = df[
+        [
+            "Date",
+            "Target_Position",
+            "Trade_Size",
+        ]
+    ]
 
-    print("signals_strategy_3.csv saved\n")
+    output.to_csv(
+        "signals_strategy_3.csv",
+        index=False,
+    )
 
-    print("Forecasted State Distribution:")
-    dist = df["Forecasted_State"].value_counts().sort_index()
-    for s, count in dist.items():
-        pct = 100 * count / len(df)
-        print(f"  State {s} ({STATE_NAMES[s]}): {count:4d} days  ({pct:.1f}%)")
+    print("signals_strategy_3_5.csv saved.")
 
-    print("\nAverage Target Position by Forecasted State:")
-    avg = df.groupby("Forecasted_State")["Target_Position"].mean()
-    for s, pos in avg.items():
-        print(f"  State {s} ({STATE_NAMES[s]}): {pos:.4f}")
+    print("\nAverage Target Position:")
+    print(
+        output["Target_Position"].describe()
+    )
+
+    print("\nAverage Trade Size:")
+    print(
+        output["Trade_Size"].describe()
+    )
