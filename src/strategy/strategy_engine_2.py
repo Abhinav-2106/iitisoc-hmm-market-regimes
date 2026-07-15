@@ -1,25 +1,36 @@
+from pathlib import Path
 import pandas as pd
-import os
+
+ROOT = Path(__file__).resolve().parents[2]
+
+NUM_STATES = 5
+
+STATE_NAMES = {
+    0: "Strong Bull",
+    1: "Normal Bull",
+    2: "Bear Market",
+    3: "Extreme Event",
+    4: "Correction",
+}
 
 STATE_WEIGHTS = {
-    0: 1.0,   # Normal Bull
-    1: 0.25,  # Correction
-    2: 0.50,  # Neutral/Recovery
-    3: 0.0,   # Crisis/Panic
-    4: 1.0,   # Aggressive Bull
-    5: 0.75   # Calm Bull
+    0: 1.00,
+    1: 0.75,
+    2: 0.00,
+    3: 0.00,
+    4: 0.40,
 }
 
 
 def compute_allocation(row):
 
-    allocation = 0
+    allocation = 0.0
 
-    for state, weight in STATE_WEIGHTS.items():
+    for state in range(NUM_STATES):
 
         allocation += (
             row[f"Forecast_State_{state}"]
-            * weight
+            * STATE_WEIGHTS[state]
         )
 
     return allocation
@@ -27,20 +38,13 @@ def compute_allocation(row):
 
 if __name__ == "__main__":
 
-    path = os.path.realpath("strategy_engine_2.py")
-    data_dir = os.path.dirname(
-        os.path.dirname(path)
-    ).replace("src", "data")
-
-    os.chdir(data_dir)
-
     df = pd.read_csv(
-        "forecast_probabilities.csv"
+        ROOT / "data" / "forecast_probabilities.csv"
     )
 
     df["Target_Position"] = df.apply(
         compute_allocation,
-        axis=1
+        axis=1,
     )
 
     df["Trade_Size"] = (
@@ -53,14 +57,15 @@ if __name__ == "__main__":
         .fillna(df["Target_Position"])
     )
 
-    df.to_csv(
-        "signals_strategy_2.csv",
-        index=False
-    )
+    output = df[
+        [
+            "Date",
+            "Target_Position",
+            "Trade_Size",
+        ]
+    ]
 
-    print(df[[
-        "Date",
-        "Target_Position",
-        "Trade_Size"
-        ]].head()
+    output.to_csv(
+        ROOT / "data" / "signals_strategy_2.csv",
+        index=False,
     )

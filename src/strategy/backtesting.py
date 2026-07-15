@@ -13,7 +13,7 @@ def load_data():
     )
 
     signals = pd.read_csv(
-        ROOT / "data" / "signals_strategy_2.csv"
+        ROOT / "data" / "signals_strategy_3.csv"
     )
 
     return prices, signals
