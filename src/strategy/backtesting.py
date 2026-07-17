@@ -1,182 +1,150 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+root = Path(__file__).resolve().parents[2]
+clean_data = root / "data"
 
-# Data Loading
+TRADING_DAYS = 252
+commission = 0.0005  #broker commission
+slippagefactor = 0.05 #slippage factor for daily volatility
 
+
+#data loading
 def load_data():
-    ROOT = Path(__file__).resolve().parents[2]
+    prices = pd.read_csv(clean_data / "clean_data.csv")#loading the clean_data.csv
+    prices["Date"] = pd.to_datetime(prices["Date"])
 
-    prices = pd.read_csv(
-        ROOT / "data" / "clean_data.csv"
-    )
+    #load Lord Shubham's precomputed signal files
+    try:
+        sig1 = pd.read_csv(clean_data / "signals_strategy_1.csv")
+        sig2 = pd.read_csv(clean_data / "signals_strategy_2.csv")
+        sig1["Date"] = pd.to_datetime(sig1["Date"])
+        sig2["Date"] = pd.to_datetime(sig2["Date"])
+    except FileNotFoundError as e:
+        print(f"couldnt load csv file from {e}")
+        return None, None, None
 
-    signals = pd.read_csv(
-        ROOT / "data" / "signals_strategy_3.csv"
-    )
-
-    return prices, signals
+    return prices, sig1, sig2
 
 
-# Backtest Engine
-
+#backtest engine
 def run_backtest(prices, signals):
+    #fusing prices of nifty50 with signals
+    bt = prices.merge(signals, on="Date", how="inner")
 
-    df = prices.merge(
-        signals,
-        on="Date",
-        how="inner"
-    )
+    # Ensure columns match expected naming conventions
+    if "Target_Position" not in bt.columns:
+        # Fallback in case Shubham named the output column "signal" or "position"
+        signal_col = [col for col in bt.columns if col.lower() in ["signal", "position"]][0]
+        bt["Target_Position"] = bt[signal_col]
 
-    df["Date"] = pd.to_datetime(df["Date"])
+    bt["Return"] = bt["Close"].pct_change()#changes in nifty50 prices day by day
 
-    df["Return"] = (
-        df["Close"]
-        .pct_change()
-    )
+    # preventing look ahead bias
+    bt["Position"] = bt["Target_Position"].shift(1).fillna(0)
 
-    df["Strategy_Return"] = (
-        df["Target_Position"]
-        .shift(1)
-        * df["Return"]
-    )
+    # transaction cost
+    bt["Position_Change"] = bt["Position"].diff().abs().fillna(bt["Position"].abs())#calculating turnover
+    dslippage = bt["Return"].abs() * slippagefactor#dynamic slippage
+    bt["Cost"] = bt["Position_Change"] * (commission + dslippage)#total
 
-    df["Strategy_Return"] = (
-        df["Strategy_Return"]
-        .fillna(0)
-    )
+    bt["Strategy_Return"] = (bt["Position"] * bt["Return"]) - bt["Cost"]
+    bt["Strategy_Return"] = bt["Strategy_Return"].fillna(0)
 
+    bt["Equity"] = (1 + bt["Strategy_Return"]).cumprod()
+    bt["Market_Equity"] = (1 + bt["Return"].fillna(0)).cumprod()
 
-    df["Equity"] = (
-        1 + df["Strategy_Return"]
-    ).cumprod()
-
-    # Buy & Hold Equity Curve
-    df["Market_Equity"] = (
-        1 + df["Return"].fillna(0)
-    ).cumprod()
-
-    return df
+    return bt
 
 
-# Performance Metrics
+#metrics
+def calculate_metrics(bt, label="Strategy"):
+  #cagr
+    years = (bt["Date"].iloc[-1] - bt["Date"].iloc[0]).days / 365.25
+    cagr = (bt["Equity"].iloc[-1] ** (1 / years)) - 1 if years > 0 else 0
 
-def calculate_cagr(df):
+    #sharpe
+    std = bt["Strategy_Return"].std()
+    sharpe = (bt["Strategy_Return"].mean() / std) * np.sqrt(TRADING_DAYS) if std > 0 else 0
 
-    years = (
-        (df["Date"].iloc[-1] - df["Date"].iloc[0]).days
-        / 365.25
-    )
+    #sortino
+    downside = bt["Strategy_Return"][bt["Strategy_Return"] < 0]
+    sortino = (bt["Strategy_Return"].mean() / downside.std()) * np.sqrt(TRADING_DAYS) if not downside.empty else 0
 
-    final_equity = df["Equity"].iloc[-1]
+    #maximum drawdown
+    drawdown = (bt["Equity"] / bt["Equity"].cummax()) - 1
+    max_dd = drawdown.min()
 
-    cagr = (
-        final_equity ** (1 / years)
-        - 1
-    )
+    #calmar
+    calmar = cagr / abs(max_dd) if max_dd < 0 else 0
 
-    return cagr
+    #winrate
+    win_rate = (bt[bt["Position"] != 0]["Strategy_Return"] > 0).mean()
 
+    return {
+        "Strategy": label,
+        "CAGR": f"{cagr:.2%}",
+        "Sharpe": round(sharpe, 2),
+        "Sortino": round(sortino, 2),
+        "Max Drawdown": f"{max_dd:.2%}",
+        "Calmar": round(calmar, 2),
+        "Win Rate": f"{win_rate:.2%}"
+    }
 
-def calculate_sharpe(df):
-
-    sharpe = (
-        df["Strategy_Return"].mean()
-        /
-        df["Strategy_Return"].std()
-    ) * (252 ** 0.5)
-
-    return sharpe
-
-
-def calculate_max_drawdown(df):
-
-    df["Rolling_Max"] = (
-        df["Equity"]
-        .cummax()
-    )
-
-    df["Drawdown"] = (
-        df["Equity"]
-        /
-        df["Rolling_Max"]
-        - 1
-    )
-
-    return df["Drawdown"].min()
-
-
-# Visualization
-
-def plot_equity_curve(df):
-
+#visualizayion
+def compare_equity(bt_dict):
     plt.figure(figsize=(12, 6))
-
-    plt.plot(
-        df["Date"],
-        df["Equity"]
-    )
-
-    plt.title("Strategy Equity Curve")
+    for name, bt in bt_dict.items():
+        plt.plot(bt["Date"], bt["Equity"], label=name)
+    plt.title("Strategies vs Benchmark")
     plt.xlabel("Date")
-    plt.ylabel("Portfolio Value")
-
-    plt.grid(True)
-    plt.show()
-
-
-def compare_with_buy_hold(df):
-
-    plt.figure(figsize=(12, 6))
-
-    plt.plot(
-        df["Date"],
-        df["Equity"],
-        label="Strategy"
-    )
-
-    plt.plot(
-        df["Date"],
-        df["Market_Equity"],
-        label="Buy & Hold"
-    )
-
-    plt.title("Strategy vs Buy & Hold")
-
+    plt.ylabel("Cumulative Returns")
     plt.legend()
-    plt.grid(True)
-
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
     plt.show()
 
-
-# Main
-
+#main execution
 def main():
+    print("Loading signals and data")
+    prices, sig1, sig2 = load_data()
 
-    prices, signals = load_data()
+    if prices is None:
+        return
 
-    df = run_backtest(
-        prices,
-        signals
-    )
+    print("Running Backtest")
 
-    cagr = calculate_cagr(df)
-    sharpe = calculate_sharpe(df)
-    max_dd = calculate_max_drawdown(df)
+    #strategy 1
+    bt1 = run_backtest(prices, sig1)
 
-    print("=" * 40)
-    print("BACKTEST RESULTS")
-    print("=" * 40)
+    #strategy 2
+    bt2 = run_backtest(prices, sig2)
 
-    print(f"CAGR: {cagr:.2%}")
-    print(f"Sharpe Ratio: {sharpe:.2f}")
-    print(f"Max Drawdown: {max_dd:.2%}")
+    #buy & hold
+    buy_hold_signals = pd.DataFrame({"Date": prices["Date"], "Target_Position": 1.0})
+    bt_bh = run_backtest(prices, buy_hold_signals)
 
-    plot_equity_curve(df)
+    results_bt = {
+        "Strategy 1": bt1,
+        "Strategy 2": bt2,
+        "Buy & Hold": bt_bh
+    }
 
-    compare_with_buy_hold(df)
+    metrics_list = [
+        calculate_metrics(bt1, label="Strategy 1"),
+        calculate_metrics(bt2, label="Strategy 2"),
+        calculate_metrics(bt_bh, label="Buy & Hold")
+    ]
 
+
+    print("PERFORMANCE METRICS")
+    metrics_df = pd.DataFrame(metrics_list)
+    print(metrics_df.to_string(index=False))
+
+    print("\nPlotting Equity Curves...")
+    compare_equity(results_bt)
 
 if __name__ == "__main__":
     main()
