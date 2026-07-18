@@ -1,8 +1,10 @@
+# importing libs
 from pathlib import Path
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# updates num_states
 NUM_STATES = 5
 
 STATE_NAMES = {
@@ -15,7 +17,7 @@ STATE_NAMES = {
 
 STATE_WEIGHTS = {
     0: 1.00,
-    1: 0.75,
+    1: 0.85,
     2: 0.00,
     3: 0.00,
     4: 0.40,

@@ -1,9 +1,12 @@
+# Importing libs
 import pandas as pd
 from pathlib import Path
 import pandas as pd
 
+# updated num_states
 NUM_STATES = 5
 
+# Interpretation of the states
 STATE_NAMES = {
     0: "Strong Bull",
     1: "Normal Bull",
@@ -12,15 +15,16 @@ STATE_NAMES = {
     4: "Correction",
 }
 
+# Static portfolio weights 
 STATE_WEIGHTS = {
     0: 1.00,
-    1: 0.75,
+    1: 0.85,
     2: 0.00,
     3: 0.00,
     4: 0.40,
 }
 
-
+# allocation = dot product of prob vector and weights
 def compute_allocation(row):
     allocation = 0.0
 

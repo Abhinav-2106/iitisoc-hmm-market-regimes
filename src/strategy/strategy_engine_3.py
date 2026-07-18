@@ -9,17 +9,16 @@ from strategies import momentum, mean_reversion, risk
 print(risk.__file__)
 print(dir(risk))
 
-MOMENTUM_STATES       = {0, 4, 5}
-MEAN_REVERSION_STATES = {2}
-CASH_STATES           = {1, 3}
+BULL_STATES    = [0, 1]   # Both positive Sharpe → Momentum
+NEUTRAL_STATES = [4]      # Correction, persistent → Mean Reversion
+BEAR_STATES    = [2, 3]   # Negative return, crisis → Cash
 
 STATE_NAMES = {
-    0: "Normal Bull",
-    1: "Correction",
-    2: "Neutral/Recovery",
-    3: "Crisis/Panic",
-    4: "Aggressive Bull",
-    5: "Calm Bull",
+    0: "Strong Bull",
+    1: "Normal Bull",
+    2: "Bear Market",
+    3: "Extreme Event",
+    4: "Correction",
 }
 
 def aggregate_regimes(row: pd.Series):
@@ -30,16 +29,15 @@ def aggregate_regimes(row: pd.Series):
 
     bull_prob = (
         row["Forecast_State_0"]
-        + row["Forecast_State_4"]
-        + row["Forecast_State_5"]
+        + row["Forecast_State_1"]
     )
 
     neutral_prob = (
-        row["Forecast_State_2"]
+        row["Forecast_State_4"]
     )
 
     bear_prob = (
-        row["Forecast_State_1"]
+        row["Forecast_State_2"]
         + row["Forecast_State_3"]
     )
 
@@ -81,7 +79,7 @@ def compute_position_row(
     # Forecast probability vector
     forecast_probs = np.array([
         row[f"Forecast_State_{i}"]
-        for i in range(6)
+        for i in range(5)
     ])
 
     # Expected regime stability

@@ -1,31 +1,31 @@
 import pandas as pd
 
-SMA_FAST = 20
-SMA_SLOW = 50
+sma_fast = 20
+sma_slow = 50
 
-def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def compute_indicators(df: pd.dataframe) -> pd.dataframe:
     """
-    Compute all indicators required by the momentum strategy.
+    compute all indicators required by the momentum strategy.
     """
 
     df = df.copy()
 
-    df["SMA20"] = df["Close"].rolling(SMA_FAST).mean()
-    df["SMA50"] = df["Close"].rolling(SMA_SLOW).mean()
+    df["sma20"] = df["close"].rolling(sma_fast).mean()
+    df["sma50"] = df["close"].rolling(sma_slow).mean()
     
     return df
 
 
 def score(close : float, sma20 : float, sma50 : float) -> float:
     """
-    Computes a continuous momentum confidence score.
+    computes a continuous momentum confidence score.
 
-    Weights:
-    - 0.50 : Close > SMA50
-    - 0.30 : SMA20 > SMA50
-    - 0.20 : Close > SMA20
+    weights:
+    - 0.50 : close > sma50
+    - 0.30 : sma20 > sma50
+    - 0.20 : close > sma20
 
-    Returns:
+    returns:
         float in [0.0, 1.0]
     """
 

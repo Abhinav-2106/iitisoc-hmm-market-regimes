@@ -104,6 +104,7 @@ def compare_equity(bt_dict):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    plt.savefig("my_plot.png", dpi=300, bbox_inches="tight")
     plt.show()
 
 #main execution
