@@ -73,7 +73,7 @@ def compute_position_row(
     )
 
     # Raw signals
-    bull_signal = bull_prob * momentum_score
+    bull_signal = bull_prob * (0.6 + 0.4 * momentum_score)
     neutral_signal = neutral_prob * mr_score
 
     # Forecast probability vector
@@ -189,10 +189,40 @@ if __name__ == "__main__":
         df["Trade_Size"]
         .fillna(df["Target_Position"])
     )
+    # # ── Sanity checks ─────────────────────────────────────────────
+    # df["Momentum_Score"] = df.apply(
+    #     lambda r: momentum.score(r["Close"], r["SMA20"], r["SMA50"]),
+    #     axis=1
+    # )
+    # df["MR_Score"] = df.apply(
+    #     lambda r: mean_reversion.score(
+    #         r["Close"], r["RSI14"], r["BB_Upper"], r["BB_Lower"]
+    #     ),
+    #     axis=1
+    # )
+    # df["Bull_Prob"] = df.apply(
+    #     lambda r: r["Forecast_State_0"] + r["Forecast_State_1"], axis=1
+    # )
 
+    # print("\n" + "="*50)
+    # print("SANITY CHECKS — these must be different")
+    # print("="*50)
+    # print(f"Momentum_Score mean : {df['Momentum_Score'].mean():.4f}")
+    # print(f"MR_Score mean       : {df['MR_Score'].mean():.4f}")
+    # print(f"  → If identical, momentum.py still has the bug")
+    # print(f"\nBull_Prob mean      : {df['Bull_Prob'].mean():.4f}")
+    # print(f"  → Should be ~0.66")
+    # print(f"\nTarget_Position mean: {df['Target_Position'].mean():.4f}")
+    # print(f"  → Should be higher than V1's ~0.59")
+    # print(f"\nTurnover (mean daily change):")
+    # changes = df["Target_Position"].diff().abs().dropna()
+    # print(f"  Mean change         : {changes.mean():.4f}")
+    # print(f"  Days > 0.10 change  : {(changes > 0.10).mean():.1%}")
+    # print(f"  → Should be < 20% (forecast probs are naturally smooth)")
     # ------------------------------------------------------------
     # Save output
     # ------------------------------------------------------------
+    
     output = df[
         [
             "Date",
@@ -211,9 +241,4 @@ if __name__ == "__main__":
     print("\nAverage Target Position:")
     print(
         output["Target_Position"].describe()
-    )
-
-    print("\nAverage Trade Size:")
-    print(
-        output["Trade_Size"].describe()
     )

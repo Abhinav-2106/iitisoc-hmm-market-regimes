@@ -10,8 +10,8 @@ def compute_indicators(df: pd.dataframe) -> pd.dataframe:
 
     df = df.copy()
 
-    df["sma20"] = df["close"].rolling(sma_fast).mean()
-    df["sma50"] = df["close"].rolling(sma_slow).mean()
+    df["SMA20"] = df["Close"].rolling(sma_fast).mean()
+    df["SMA50"] = df["Close"].rolling(sma_slow).mean()
     
     return df
 
