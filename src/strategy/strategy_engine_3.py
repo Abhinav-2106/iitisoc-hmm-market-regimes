@@ -1,29 +1,23 @@
+# importing libraries
 import pandas as pd
 import numpy as np
-import os
-import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+# importing local files
 from strategies import momentum, mean_reversion, risk
 
-print(risk.__file__)
-print(dir(risk))
+# declaring the number of states
+NUM_STATES = 5
 
+# Interpretation fo states
 BULL_STATES    = [0, 1]   # Both positive Sharpe → Momentum
 NEUTRAL_STATES = [4]      # Correction, persistent → Mean Reversion
 BEAR_STATES    = [2, 3]   # Negative return, crisis → Cash
 
-STATE_NAMES = {
-    0: "Strong Bull",
-    1: "Normal Bull",
-    2: "Bear Market",
-    3: "Extreme Event",
-    4: "Correction",
-}
 
 def aggregate_regimes(row: pd.Series):
     """
-    Aggregate the six forecasted HMM states into
+    Aggregate the five forecasted HMM states into
     Bull, Neutral and Bear probabilities.
     """
 
@@ -46,6 +40,7 @@ def aggregate_regimes(row: pd.Series):
         neutral_prob,
         bear_prob,
     )
+
 
 def compute_position_row(
     row: pd.Series,
@@ -95,23 +90,41 @@ def compute_position_row(
         stability,
     )
 
-if __name__ == "__main__":
+def sanity_checks(df):
 
-    # ------------------------------------------------------------
-    # Resolve data directory
-    # ------------------------------------------------------------
-    path = os.path.realpath("strategy_engine_3_5.py")
+    df["Momentum_Score"] = df.apply(
+        lambda r: momentum.score(r["Close"], r["SMA20"], r["SMA50"]),
+        axis=1
+    )
+    df["MR_Score"] = df.apply(
+        lambda r: mean_reversion.score(
+            r["Close"], r["RSI14"], r["BB_Upper"], r["BB_Lower"]
+        ),
+        axis=1
+    )
+    df["Bull_Prob"] = df.apply(
+        lambda r: r["Forecast_State_0"] + r["Forecast_State_1"], axis=1
+    )
 
-    data_dir = os.path.dirname(
-        os.path.dirname(path)
-    ).replace("src", "data")
+    print(f"Momentum_Score mean : {df['Momentum_Score'].mean():.4f}")
+    print(f"MR_Score mean       : {df['MR_Score'].mean():.4f}")
 
-    os.chdir(data_dir)
+    print(f"\nBull_Prob mean      : {df['Bull_Prob'].mean():.4f}")
+    print(f"\nTarget_Position mean: {df['Target_Position'].mean():.4f}")
+    print(f"\nTurnover (mean daily change):")
 
-    # ------------------------------------------------------------
+    changes = df["Target_Position"].diff().abs().dropna()
+    print(f"  Mean change         : {changes.mean():.4f}")
+    print(f"  Days > 0.10 change  : {(changes > 0.10).mean():.1%}")
+
+def main():
+    # declaring path
+    root = Path(__file__).resolve().parents[2]
+
     # Load price data
-    # ------------------------------------------------------------
-    prices_df = pd.read_csv("clean_data.csv")
+    prices_df = pd.read_csv(
+        root / "data" / "clean_data.csv"
+    )
 
     prices_df["Date"] = pd.to_datetime(
         prices_df["Date"]
@@ -123,21 +136,18 @@ if __name__ == "__main__":
         .reset_index(drop=True)
     )
 
-    # ------------------------------------------------------------
     # Compute strategy indicators
-    # ------------------------------------------------------------
     prices_df = momentum.compute_indicators(prices_df)
 
     prices_df = mean_reversion.compute_indicators(prices_df)
 
-    # ------------------------------------------------------------
     # Load forecast probabilities
-    # ------------------------------------------------------------
     forecast_df = pd.read_csv(
-        "forecast_probabilities.csv"
+        root / "data"/ "forecast_probabilities.csv"
     )
+    # load transition matrix
     transition_matrix = pd.read_csv(
-        "transition_matrix.csv"
+        root / "data" / "transition_matrix.csv"
     ).values
 
     forecast_df["Date"] = pd.to_datetime(
@@ -150,9 +160,7 @@ if __name__ == "__main__":
         .reset_index(drop=True)
     )
 
-    # ------------------------------------------------------------
     # Merge datasets
-    # ------------------------------------------------------------
     df = forecast_df.merge(
         prices_df[
             [
@@ -169,17 +177,13 @@ if __name__ == "__main__":
         how="inner",
     )
 
-    
-
     df["Target_Position"] = df.apply(
         compute_position_row,
         axis=1,
         transition_matrix=transition_matrix,
     )
 
-    # ------------------------------------------------------------
     # Compute trade size
-    # ------------------------------------------------------------
     df["Trade_Size"] = (
         df["Target_Position"]
         - df["Target_Position"].shift(1)
@@ -189,40 +193,10 @@ if __name__ == "__main__":
         df["Trade_Size"]
         .fillna(df["Target_Position"])
     )
-    # # ── Sanity checks ─────────────────────────────────────────────
-    # df["Momentum_Score"] = df.apply(
-    #     lambda r: momentum.score(r["Close"], r["SMA20"], r["SMA50"]),
-    #     axis=1
-    # )
-    # df["MR_Score"] = df.apply(
-    #     lambda r: mean_reversion.score(
-    #         r["Close"], r["RSI14"], r["BB_Upper"], r["BB_Lower"]
-    #     ),
-    #     axis=1
-    # )
-    # df["Bull_Prob"] = df.apply(
-    #     lambda r: r["Forecast_State_0"] + r["Forecast_State_1"], axis=1
-    # )
-
-    # print("\n" + "="*50)
-    # print("SANITY CHECKS — these must be different")
-    # print("="*50)
-    # print(f"Momentum_Score mean : {df['Momentum_Score'].mean():.4f}")
-    # print(f"MR_Score mean       : {df['MR_Score'].mean():.4f}")
-    # print(f"  → If identical, momentum.py still has the bug")
-    # print(f"\nBull_Prob mean      : {df['Bull_Prob'].mean():.4f}")
-    # print(f"  → Should be ~0.66")
-    # print(f"\nTarget_Position mean: {df['Target_Position'].mean():.4f}")
-    # print(f"  → Should be higher than V1's ~0.59")
-    # print(f"\nTurnover (mean daily change):")
-    # changes = df["Target_Position"].diff().abs().dropna()
-    # print(f"  Mean change         : {changes.mean():.4f}")
-    # print(f"  Days > 0.10 change  : {(changes > 0.10).mean():.1%}")
-    # print(f"  → Should be < 20% (forecast probs are naturally smooth)")
-    # ------------------------------------------------------------
-    # Save output
-    # ------------------------------------------------------------
     
+    # sanity_checks(df)
+    
+    # Save output
     output = df[
         [
             "Date",
@@ -232,13 +206,9 @@ if __name__ == "__main__":
     ]
 
     output.to_csv(
-        "signals_strategy_3.csv",
+        root / "data" / "signals_strategy_3.csv",
         index=False,
     )
 
-    print("signals_strategy_3_5.csv saved.")
-
-    print("\nAverage Target Position:")
-    print(
-        output["Target_Position"].describe()
-    )
+if __name__ == "__main__":
+    main()

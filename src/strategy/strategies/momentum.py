@@ -3,7 +3,7 @@ import pandas as pd
 sma_fast = 20
 sma_slow = 50
 
-def compute_indicators(df: pd.dataframe) -> pd.dataframe:
+def compute_indicators(df: pd.dataframe) -> pd.Dataframe:
     """
     compute all indicators required by the momentum strategy.
     """
@@ -29,18 +29,18 @@ def score(close : float, sma20 : float, sma50 : float) -> float:
         float in [0.0, 1.0]
     """
 
-    score = 0.0
+    val = 0.0
 
     if pd.isna(sma20) or pd.isna(sma50):
         return 0.0
 
     if close > sma50:
-        score += 0.5
+        val += 0.5
     
     if sma20 > sma50:
-        score += 0.3
+        val += 0.3
     
     if close > sma20:
-        score += 0.2
+        val += 0.2
     
-    return score
+    return val
