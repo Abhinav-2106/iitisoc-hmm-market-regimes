@@ -1,11 +1,13 @@
+# importing libs
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
+# declaring path
+root = Path(__file__).resolve().parents[2]
 
+# number of states
 NUM_STATES = 5
-
 
 def forecast_probs(row, transition_matrix):
 
@@ -31,16 +33,15 @@ def forecast_probs(row, transition_matrix):
 def load_matrix():
 
     transition_matrix = pd.read_csv(
-        ROOT / "data" / "transition_matrix.csv"
+        root / "data" / "transition_matrix.csv"
     )
 
     return transition_matrix.values
 
-
-if __name__ == "__main__":
+def main():
 
     probs_df = pd.read_csv(
-        ROOT / "data" / "state_probabilities.csv"
+        root / "data" / "state_probabilities.csv"
     )
 
     transition_matrix = load_matrix()
@@ -57,6 +58,9 @@ if __name__ == "__main__":
     )
 
     result.to_csv(
-        ROOT / "data" / "forecast_probabilities.csv",
+        root / "data" / "forecast_probabilities.csv",
         index=False,
     )
+
+if __name__ == "__main__":
+    main()
