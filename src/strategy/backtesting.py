@@ -115,7 +115,10 @@ def compare_equity(bt_dict):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig('plot.png', dpi=300)
+    plt.savefig(
+        root / "data" / "backtesting_plot.png",
+        dpi=300
+    )
     plt.show()
 
 
