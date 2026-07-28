@@ -1,4 +1,3 @@
-
 # HIDDEN MARKOV MODEL BASELINE FOR MARKET REGIME DETECTION
 
 # Project
@@ -52,10 +51,24 @@ import pandas as pd
 import numpy as np
 import joblib
 
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 from hmmlearn.hmm import GaussianHMM
+from ta.volatility import AverageTrueRange
+from ta.momentum import RSIIndicator
+from ta.trend import ADXIndicator
 
 import matplotlib.pyplot as plt
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
+DATA_DIR = ROOT_DIR / "data"
+
+MODELS_DIR = ROOT_DIR / "models"
+
+DATA_DIR.mkdir(exist_ok=True)
+
+MODELS_DIR.mkdir(exist_ok=True)
 # STEP 1 : MARKET DATA COLLECTION
 # Objective
 # Download historical daily OHLCV (Open, High, Low, Close, Volume) data for the NIFTY 50 index.
@@ -122,7 +135,7 @@ data.columns.name = None
 # Sort by date
 data = data.sort_values("Date").reset_index(drop=True)
 # Save clean dataset
-data.to_csv("clean_data.csv", index=False)
+data.to_csv(DATA_DIR / "clean_data.csv", index=False)
 print(data.columns)
 print(data.shape)
 data.head()
@@ -130,46 +143,76 @@ data.head()
 # ========================================================
 # Feature Engineering
 # ========================================================
-# Feature 1 : Log Return
-# Log returns measure the day-to-day percentage change in
-# market prices while preserving important statistical
-# properties such as time additivity.
-# They represent the primary measure of market direction
-# and are widely used in quantitative finance.
+
+# 1. Log Return
 data["Log_Return"] = np.log(
     data["Close"] / data["Close"].shift(1)
 )
-# Feature 2 : Rolling Volatility
-# Rolling volatility estimates recent market uncertainty.
-# Periods of financial stress typically exhibit sustained
-# increases in volatility, making this feature highly
-# informative for distinguishing calm and turbulent market regimes
-data["Volatility"] = data["Log_Return"].rolling(window=20).std()
-# Feature 3 : Daily Trading Range
-# The normalized high-low range captures intraday price
-# movement that may not be fully reflected by closing returns alone.
-# This provides additional information about market
-# activity and uncertainty within each trading session.
 
-data["Range"] = (
-    data["High"] - data["Low"]
-) / data["Close"]
-# Remove NaN values created by rolling window
+# 2. EWMA Volatility
+data["EWMA_Volatility"] = (
+    data["Log_Return"]
+    .ewm(span=20, adjust=False)
+    .std()
+)
+
+# 3. ATR (14)
+
+atr = AverageTrueRange(
+    high=data["High"],
+    low=data["Low"],
+    close=data["Close"],
+    window=14
+)
+
+data["ATR"] = atr.average_true_range()
+
+# 4. RSI (14)
+
+rsi = RSIIndicator(
+    close=data["Close"],
+    window=14
+)
+
+data["RSI"] = rsi.rsi()
+
+# 5. ADX (14)
+
+adx = ADXIndicator(
+    high=data["High"],
+    low=data["Low"],
+    close=data["Close"],
+    window=14
+)
+
+data["ADX"] = adx.adx()
+
+# Remove NaNs
+
 data = data.dropna().reset_index(drop=True)
 
-features = data[[
-    "Date",
-    "Log_Return",
-    "Volatility",
-    "Range"
-]].copy()
-features.to_csv("features.csv", index=False)
+features = data[
+    [
+        "Date",
+        "Log_Return",
+        "EWMA_Volatility",
+        "ATR",
+        "RSI",
+        "ADX"
+    ]
+].copy()
+features.to_csv(
+    DATA_DIR / "features.csv",
+    index=False
+)
 print(features.head())
 print(features.shape)
 # Standardize all features before HMM training.
 # Log returns, volatility, and trading range exist on different numerical scales.
 # Standardization prevents features with larger magnitudes from dominating the Gaussian likelihood estimation.
-X = features[["Log_Return", "Volatility","Range"]]
+X = features[
+    ["Log_Return","EWMA_Volatility","ATR","RSI","ADX"]
+]
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 print(X_scaled[:5])
@@ -186,9 +229,10 @@ print(X_scaled.shape)
 #  Initial state probabilities
 # without requiring manually labelled market regimes.
 hmm_model = GaussianHMM(
-    n_components=6,
+    n_components=5,
     covariance_type="full",
-    n_iter=100,
+    n_iter=500,
+    tol=1e-4,
     random_state=42
 )
 
@@ -202,11 +246,6 @@ print("Training completed")
 print("Number of states:", hmm_model.n_components)
 print("Log Likelihood:", log_likelihood)
 
-joblib.dump(
-    hmm_model,
-    "hmm_model.pkl"
-)
-
 print("State Means:")
 print(hmm_model.means_)
 print("\nTransition Matrix:")
@@ -214,13 +253,6 @@ print(hmm_model.transmat_)
 
 # from google.colab import drive
 # drive.mount('/content/drive')
-
-features.to_csv(
-    "/content/drive/MyDrive/features.csv",
-    index=False
-)
-
-print("features.csv saved")
 
 # Infer the most probable hidden regime for every trading day using the Viterbi algorithm.
 # These inferred regimes form the foundation for all downstream analysis including transition analysis, strategy development, and backtesting.
@@ -235,7 +267,13 @@ print(features["State"].value_counts())
 print("\nState Statistics:")
 print(
     features.groupby("State")[
-        ["Log_Return", "Volatility", "Range"]
+        [
+            "Log_Return",
+            "EWMA_Volatility",
+            "ATR",
+            "RSI",
+            "ADX",
+        ]
     ].mean()
 )
 
@@ -243,12 +281,11 @@ states_df = features[
     ["Date", "State"]
 ].copy()
 
-states_df.to_csv("states.csv", index=False)
-
 states_df.to_csv(
-    "/content/drive/MyDrive/states.csv",
+    DATA_DIR / "states.csv",
     index=False
 )
+
 print("states.csv saved successfully")
 # Compute posterior probabilities for every hidden state.
 # Unlike the Viterbi prediction, which assigns only one regime to each observation, posterior probabilities quantify the model's confidence across all possible regimes.
@@ -267,13 +304,10 @@ prob_df = pd.DataFrame(
 )
 prob_df["Date"] = features["Date"]
 prob_df.to_csv(
-    "state_probabilities.csv",
+    DATA_DIR / "state_probabilities.csv",
     index=False
 )
-prob_df.to_csv(
-    "/content/drive/MyDrive/state_probabilities.csv",
-    index=False
-)
+
 print("state_probabilities.csv saved")
 # Export the learned transition probability matrix.
 
@@ -283,13 +317,13 @@ transition_df = pd.DataFrame(
     hmm_model.transmat_
 )
 
+
 transition_df.to_csv(
-    "transition_matrix.csv",
+
+    DATA_DIR / "transition_matrix.csv",
+
     index=False
-)
-transition_df.to_csv(
-    "/content/drive/MyDrive/transition_matrix.csv",
-    index=False
+
 )
 print("transition_matrix.csv saved")
 
@@ -341,14 +375,12 @@ state_characteristics = pd.DataFrame(
 )
 
 state_characteristics.to_csv(
-    "state_characteristics.csv",
+
+    DATA_DIR / "state_characteristics.csv",
+
     index=False
+
 )
-state_characteristics.to_csv(
-    "/content/drive/MyDrive/state_characteristics.csv",
-    index=False
-)
-state_characteristics
 
 
 # Measure regime persistence.
@@ -375,23 +407,21 @@ persistence_df = pd.DataFrame(
 )
 
 persistence_df.to_csv(
-    "persistence_metrics.csv",
-    index=False
-)
-persistence_df.to_csv(
-    "/content/drive/MyDrive/persistence_metrics.csv",
-    index=False
-)
-persistence_df
 
-import joblib
+    DATA_DIR / "persistence_metrics.csv",
+
+    index=False
+
+)
+
 joblib.dump(
     hmm_model,
-    "hmm_model.pkl"
+    MODELS_DIR / "hmm_model.pkl"
 )
+
 joblib.dump(
     scaler,
-    "scaler.pkl"
+    MODELS_DIR / "scaler.pkl"
 )
 print("Model and scaler saved")
 
@@ -430,10 +460,10 @@ plt.title("NIFTY 50 Regimes")
 plt.xlabel("Date")
 plt.ylabel("Close")
 plt.legend()
-plt.show()
 plt.savefig(
-    "/content/drive/MyDrive/plot_4state_range.png",
+    DATA_DIR / "market_regimes.png",
     dpi=300,
     bbox_inches="tight"
 )
 
+plt.show()
