@@ -1,5 +1,5 @@
 # %%
-%pip install yfinance scikit-learn hmmlearn matplotlib
+# %pip install yfinance scikit-learn hmmlearn matplotlib
 
 # %%
 # HIDDEN MARKOV MODEL BASELINE FOR MARKET REGIME DETECTION
@@ -65,7 +65,7 @@ import matplotlib.pyplot as plt
 # %%
 # ROOT = Path(__file__).resolve().parents[2]
 
-ROOT = Path.cwd().parent
+ROOT = Path(__file__).resolve().parents[2]
 print(ROOT)
 
 # STEP 1 : MARKET DATA COLLECTION
