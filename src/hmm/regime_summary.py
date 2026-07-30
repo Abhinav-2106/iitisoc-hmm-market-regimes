@@ -45,8 +45,8 @@ def main():
             "Return_Std":
             state_data["Log_Return"].std(),
 
-            "Mean_Range":
-            state_data["Range"].mean()
+            "Mean_GK_Volatility":
+            state_data["GK_Volatility"].mean()
 
         })
 
@@ -77,13 +77,6 @@ def main():
         ]
     )
 
-    summary = summary.rename(
-        columns={
-            "gk_Volatility":
-            "Mean_GK_Volatility"
-        }
-    )
-
     columns = [
 
         "State",
@@ -99,8 +92,6 @@ def main():
         "Return_Std",
 
         "Mean_GK_Volatility",
-
-        "Mean_Range",
 
         "Sharpe_Ratio",
 
