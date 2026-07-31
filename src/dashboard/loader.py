@@ -121,3 +121,4 @@ def load_dashboard_data():
     )
 
     return dashboard
+
