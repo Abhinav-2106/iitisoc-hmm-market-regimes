@@ -1,3 +1,6 @@
+The readme is not updated after mid eval, sorry about this.
+
+
 # Market Regime Detection and Adaptive Trading using Hidden Markov Models
 
 ## Problem Statement
