@@ -46,7 +46,7 @@ def main():
             state_data["Log_Return"].std(),
 
             "Mean_GK_Volatility":
-            state_data["GK_Volatility"].mean()
+            state_data["gk_volatility"].mean()
 
         })
 

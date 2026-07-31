@@ -179,31 +179,31 @@ print("features.csv saved")
 # %%
 
 # %%
-def enforce_min_duration(states, min_duration=10):
-    states = np.array(states).copy()
-    n = len(states)
-    changed = True
+# def enforce_min_duration(states, min_duration):
+#     states = np.array(states).copy()
+#     n = len(states)
+#     changed = True
 
-    while changed:
-        changed = False
-        i = 0
-        while i < n:
-            j = i
-            while j < n and states[j] == states[i]:
-                j += 1
-            run_length = j - i
-            if run_length < min_duration:
-                if i > 0:
-                    fill_value = states[i - 1]
-                elif j < n:
-                    fill_value = states[j]
-                else:
-                    fill_value = states[i]
-                if fill_value != states[i]:
-                    states[i:j] = fill_value
-                    changed = True
-            i = j
-    return states
+#     while changed:
+#         changed = False
+#         i = 0
+#         while i < n:
+#             j = i
+#             while j < n and states[j] == states[i]:
+#                 j += 1
+#             run_length = j - i
+#             if run_length < min_duration:
+#                 if i > 0:
+#                     fill_value = states[i - 1]
+#                 elif j < n:
+#                     fill_value = states[j]
+#                 else:
+#                     fill_value = states[i]
+#                 if fill_value != states[i]:
+#                     states[i:j] = fill_value
+#                     changed = True
+#             i = j
+#     return states
 
 # %%
 
@@ -212,7 +212,7 @@ states = np.array([
     hmm_model.predict(X_scaled[:t+1])[-1] for t in range(len(X_scaled))
 ])
 
-states = enforce_min_duration(states, min_duration=15)
+    # states = enforce_min_duration(states, min_duration=7
 
 features["State"] = states 
 
