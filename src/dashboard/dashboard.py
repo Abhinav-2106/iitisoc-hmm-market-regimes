@@ -159,3 +159,4 @@ with market_tab:
         probability_chart(dashboard.market_data),
         use_container_width=True,
     )
+
