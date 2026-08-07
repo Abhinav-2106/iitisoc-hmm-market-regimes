@@ -9,21 +9,6 @@ STATE_COLORS = {
     3: "#f59e0b",   # orange
     4: "#8b5cf6",   # purple
 }
-
-
-#price vs regime
-
-import plotly.graph_objects as go
-
-STATE_COLORS = {
-    0: "#EF4444",
-    1: "#22C55E",
-    2: "#3B82F6",
-    3: "#F59E0B",
-    4: "#8B5CF6",
-}
-
-
 def regime_price_chart(df):
 
     fig = go.Figure()
@@ -119,3 +104,80 @@ def probability_chart(df):
 
     return fig
 
+def transition_heatmap(df):
+
+    fig = px.imshow(
+        df,
+        text_auto=".2f",
+        aspect="auto",
+        color_continuous_scale="Blues"
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title="Transition Matrix",
+        height=500
+    )
+
+    return fig
+def gk_volatility_chart(df):
+
+    fig = px.histogram(
+        df,
+        x="gk_volatility",
+        color="State",
+        nbins=40,
+        opacity=0.7,
+        title="GK Volatility Distribution"
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=500
+    )
+
+    return fig
+def rsi_chart(df):
+
+    fig = px.histogram(
+        df,
+        x="RSI",
+        color="State",
+        nbins=40,
+        opacity=0.7,
+        title="RSI Distribution"
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=500
+    )
+
+    return fig
+def risk_chart(df, metric):
+
+    values = []
+
+    for x in df[metric]:
+
+        if isinstance(x, str) and "%" in x:
+            values.append(float(x.replace("%", "")))
+        else:
+            values.append(x)
+
+    fig = px.bar(
+        x=df["Strategy"],
+        y=values,
+        labels={
+            "x": "Strategy",
+            "y": metric
+        },
+        title=metric + " Comparison"
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=450
+    )
+
+    return fig
