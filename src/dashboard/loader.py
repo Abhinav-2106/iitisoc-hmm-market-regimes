@@ -1,31 +1,17 @@
 from pathlib import Path
-
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-
-# ------------------------------------------------------------------
-# Project Paths
-# ------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[2]
-
 DATA_DIR = ROOT / "data"
-MODELS_DIR = ROOT / "models"
 
-
-# ------------------------------------------------------------------
-# Dashboard Data Container
-# ------------------------------------------------------------------
 
 class DashboardData:
-    """
-    Stores every dataset required by the dashboard.
-    """
 
     def __init__(self):
 
-        # Raw datasets
+        # HMM files
         self.clean_data = None
         self.features = None
         self.states = None
@@ -35,90 +21,89 @@ class DashboardData:
         self.persistence_metrics = None
         self.regime_summary = None
 
-        # Combined dataset
+        # Backtesting files
+        self.metrics_in_sample = None
+        self.metrics_out_of__sample = None
+        self.metrics_yearly = None
+        self.persistence_bktest = None
+
+        # Final merged dataframe
         self.market_data = None
 
-        # Models
-        self.hmm_model = None
-        self.scaler = None
 
-
-# ------------------------------------------------------------------
-# Loader
-# ------------------------------------------------------------------
-
-@st.cache_resource
+@st.cache_data
 def load_dashboard_data():
 
-    dashboard = DashboardData()
+    data = DashboardData()
 
-    # ---------------------------
-    # CSV Files
-    # ---------------------------
+    try:
 
-    dashboard.clean_data = pd.read_csv(
-        DATA_DIR / "clean_data.csv",
-        parse_dates=["Date"]
-    )
-
-    dashboard.features = pd.read_csv(
-        DATA_DIR / "features.csv",
-        parse_dates=["Date"]
-    )
-
-    dashboard.states = pd.read_csv(
-        DATA_DIR / "states.csv",
-        parse_dates=["Date"]
-    )
-
-    dashboard.state_probabilities = pd.read_csv(
-        DATA_DIR / "state_probabilities.csv",
-        parse_dates=["Date"]
-    )
-
-    dashboard.transition_matrix = pd.read_csv(
-        DATA_DIR / "transition_matrix.csv"
-    )
-
-    dashboard.state_characteristics = pd.read_csv(
-        DATA_DIR / "state_characteristics.csv"
-    )
-
-    dashboard.persistence_metrics = pd.read_csv(
-        DATA_DIR / "persistence_metrics.csv"
-    )
-
-    dashboard.regime_summary = pd.read_csv(
-        DATA_DIR / "regime_summary.csv"
-    )
-
-    # ---------------------------
-    # Merge datasets
-    # ---------------------------
-
-    dashboard.market_data = (
-
-        dashboard.clean_data
-
-        .merge(
-            dashboard.features,
-            on="Date",
-            how="left"
+        data.clean_data = pd.read_csv(
+            DATA_DIR / "clean_data.csv",
+            parse_dates=["Date"]
         )
 
-        .merge(
-            dashboard.states,
-            on="Date",
-            how="left"
+        data.features = pd.read_csv(
+            DATA_DIR / "features.csv",
+            parse_dates=["Date"]
         )
 
-        .merge(
-            dashboard.state_probabilities,
-            on="Date",
-            how="left"
+        data.states = pd.read_csv(
+            DATA_DIR / "states.csv",
+            parse_dates=["Date"]
         )
 
+        data.state_probabilities = pd.read_csv(
+            DATA_DIR / "state_probabilities.csv",
+            parse_dates=["Date"]
+        )
+
+        data.transition_matrix = pd.read_csv(
+            DATA_DIR / "transition_matrix.csv"
+        )
+
+        data.state_characteristics = pd.read_csv(
+            DATA_DIR / "state_characteristics.csv"
+        )
+
+        data.persistence_metrics = pd.read_csv(
+            DATA_DIR / "persistence_metrics.csv"
+        )
+
+        data.regime_summary = pd.read_csv(
+            DATA_DIR / "regime_summary.csv"
+        )
+
+        # Backtesting files
+
+        data.metrics_in_sample = pd.read_csv(
+            DATA_DIR / "metrics_in_sample.csv"
+        )
+
+        data.metrics_out_of_sample = pd.read_csv(
+            DATA_DIR / "metrics_out_of_sample.csv"
+        )
+
+        data.metrics_yearly = pd.read_csv(
+            DATA_DIR / "metrics_yearly_detailed.csv"
+        )
+
+        data.persistence_bktest = pd.read_csv(
+            DATA_DIR / "persistence_metrics_bktest.csv"
+        )
+
+    except FileNotFoundError as e:
+
+        st.error(f"Missing file: {e}")
+        st.stop()
+
+    # Merge data
+
+    data.market_data = (
+        data.clean_data
+        .merge(data.features, on="Date", how="left")
+        .merge(data.states, on="Date", how="left")
+        .merge(data.state_probabilities, on="Date", how="left")
     )
 
-    return dashboard
-
+    return data
